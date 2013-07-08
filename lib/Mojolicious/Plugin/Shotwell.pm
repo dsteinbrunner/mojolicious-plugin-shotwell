@@ -6,7 +6,7 @@ Mojolicious::Plugin::Shotwell - View photos from Shotwell database
 
 =head1 VERSION
 
-0.01
+0.02
 
 =head1 SYNOPSIS
 
@@ -68,7 +68,7 @@ use Image::EXIF;
 use Image::Imlib2;
 use constant DEBUG => $ENV{MOJO_SHOTWELL_DEBUG} ? 1 : 0;
 
-our $VERSION = '0.01';
+our $VERSION = '0.02';
 our %SST;
 
 {

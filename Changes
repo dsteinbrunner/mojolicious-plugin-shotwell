@@ -1,6 +1,6 @@
 Revision history for Mojolicious-Plugin-Shotwell
 
-0.02
+0.02     Mon Jul  8 18:52:09 2013
        * Fix _scale_photo() exception handling
        * Add more DEBUG output
 
