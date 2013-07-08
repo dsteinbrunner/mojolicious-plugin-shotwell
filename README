@@ -1,0 +1,126 @@
+NAME
+    Mojolicious::Plugin::Shotwell - View photos from Shotwell database
+
+VERSION
+    0.01
+
+SYNOPSIS
+      use Mojolicious::Lite;
+
+      # allow /shotwell/... resources to be protected by login
+      my $route = under '/shotwell' => sub {
+        my $c = shift;
+        return 1 if $c->session('username');
+        $c->render('login');
+        return 0;
+      };
+
+      plugin shotwell => {
+        dbname => '/home/username/.local/share/shotwell/data/photo.db',
+        route => $route,
+      };
+
+      app->start;
+
+DESCRIPTION
+    This plugin provides actions which can render data from a Shotwell
+    <http://www.yorba.org/projects/shotwell> database.
+
+    *   Events
+
+        See "events" and "event".
+
+    *   Tags
+
+        See "tags" and "tag".
+
+    *   Thumbnails
+
+        See "thumb".
+
+    *   Photos
+
+        See "show" and "raw".
+
+ATTRIBUTES
+  dsn
+    Returns argument for "connect" in DBI. Default is
+
+      dbi:SQLite:dbname=$HOME/.local/share/shotwell/data/photo.db
+
+    $HOME is either the "SHOTWELL_HOME" or "HOME" environment variable. The
+    default attribute can be overridden by either giving "dsn" or "dbname"
+    to "register". Example:
+
+      $self->register($app, { dbname => $path_to_db_file });
+
+ACTIONS
+  events
+    Render data from EventTable.
+
+  event
+    Render photos from PhotoTable, by a given event id.
+
+  tags
+    Render data from TagTable.
+
+  tag
+    Render photos from PhotoTable, by a given tag name.
+
+  raw
+    Render image data.
+
+  show
+    Render a template with an image inside.
+
+  thumb
+    Render image as a thumb.
+
+METHODS
+  register
+      $self->register($app, \%config);
+
+    Set "ATTRIBUTES" and register "ACTIONS" in the Mojolicious application.
+
+DATABASE SCHEME
+  EventTable
+      id INTEGER PRIMARY KEY,
+      name TEXT,
+      primary_photo_id INTEGER,
+      time_created INTEGER,primary_source_id TEXT,
+      comment TEXT
+
+  PhotoTable
+      id INTEGER PRIMARY KEY,
+      filename TEXT UNIQUE NOT NULL,
+      width INTEGER,
+      height INTEGER,
+      filesize INTEGER,
+      timestamp INTEGER,
+      exposure_time INTEGER,
+      orientation INTEGER,
+      original_orientation INTEGER,
+      import_id INTEGER,
+      event_id INTEGER,
+      transformations TEXT,
+      md5 TEXT,
+      thumbnail_md5 TEXT,
+      exif_md5 TEXT,
+      time_created INTEGER,
+      flags INTEGER DEFAULT 0,
+      rating INTEGER DEFAULT 0,
+      file_format INTEGER DEFAULT 0,
+      title TEXT,
+      backlinks TEXT,
+      time_reimported INTEGER,
+      editable_id INTEGER DEFAULT -1,
+      metadata_dirty INTEGER DEFAULT 0,
+      developer TEXT,
+      develop_shotwell_id INTEGER DEFAULT -1,
+      develop_camera_id INTEGER DEFAULT -1,
+      develop_embedded_id INTEGER DEFAULT -1,
+      comment TEXT
+
+AUTHOR
+    Jan Henning Thorsen - "jhthorsen@cpan.org"
+
