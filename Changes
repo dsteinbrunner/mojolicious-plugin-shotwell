@@ -1,5 +1,9 @@
 Revision history for Mojolicious-Plugin-Shotwell
 
+0.02
+       * Fix _scale_photo() exception handling
+       * Add more DEBUG output
+
 0.01     Mon Jul  8 18:29:45 2013
-       * Started project
-       * Add cool feature
+       * Bundle default templates as examples
+       * Add logic for events, event, tags, tag, raw, show and thumb.

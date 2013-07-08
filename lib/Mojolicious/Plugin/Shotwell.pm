@@ -85,6 +85,12 @@ our %SST;
   }
 }
 
+sub _DUMP {
+  my($format, $arg) = @_;
+  require Data::Dumper;
+  printf "$format\n", Data::Dumper::Dumper($arg);
+}
+
 =head1 ATTRIBUTES
 
 =head2 cache_dir
@@ -143,6 +149,7 @@ has sizes => sub {
 };
 
 has _types => sub { Mojolicious::Types->new };
+has _log => sub { Mojo::Log->new };
 
 =head1 ACTIONS
 
@@ -278,11 +285,7 @@ sub tag {
   my $row = $sth->fetchrow_hashref or return $c->render_not_found;
   my @ids = map { s/thumb0*//; hex } grep { /^thumb/ } split /,/, $row->{photo_id_list} || '';
 
-  $self->_photos(
-    $c,
-    sprintf($SST{photos_by_ids}, join ',', map { '?' } @ids),
-    @ids,
-  );
+  $self->_photos($c, sprintf($SST{photos_by_ids}, join ',', map { '?' } @ids), @ids);
 }
 
 =head2 raw
@@ -302,13 +305,13 @@ sub raw {
     $c->res->headers->content_disposition(qq(attachment; filename="$basename"));
   }
   if($c->param('inline')) {
-    $file = $self->_scale_photo($photo, @{ $self->sizes->{inline} });
+    $file = $self->_scale_photo($photo, $self->sizes->{inline});
   }
 
   $static = Mojolicious::Static->new(paths => [dirname $file]);
 
   return $c->rendered if $static->serve($c, basename $file);
-  return $c->render_exception('Unable to serve file');
+  return $c->render_exception("Unable to serve ($file)");
 }
 
 =head2 show
@@ -342,11 +345,11 @@ Render photo as a thumbnail.
 sub thumb {
   my($self, $c) = @_;
   my $photo = $self->_photo($c) or return;
-  my $file = $self->_scale_photo($photo, @{ $self->sizes->{thumb} });
+  my $file = $self->_scale_photo($photo, $self->sizes->{thumb});
   my $static = Mojolicious::Static->new(paths => [dirname $file]);
 
   return $c->rendered if $static->serve($c, basename $file);
-  return $c->render_exception('Unable to serve file');
+  return $c->render_exception("Unable to serve ($file)");
 }
 
 sub _photo {
@@ -356,6 +359,7 @@ sub _photo {
   my $basename;
 
   if(!$photo) {
+    warn "[SHOTWELL] Could not find photo by id\n" if DEBUG;
     $c->render_not_found;
     return;
   }
@@ -364,6 +368,7 @@ sub _photo {
   $basename = basename $photo->{filename};
 
   if($c->stash('basename') ne $basename) {
+    _DUMP 'photo=%s', $photo if DEBUG;
     $c->render_exception("Invalid basename: $basename");
     return;
   }
@@ -413,12 +418,13 @@ sub _more_photo_info {
 
   $photo->{height} ||= $photo->{info}{'Image Height'} || 0;
   $photo->{width} ||= $photo->{info}{'Image Width'} || 0;
+  _DUMP 'info=%s', $photo if DEBUG;
   $photo;
 }
 
 sub _scale_photo {
-  my($self, $photo, @size) = @_;
-  my $out = sprintf '%s/%s-%sx%s', $self->cache_dir, md5_sum($photo->{filename}), @size;
+  my($self, $photo, $size) = @_;
+  my $out = sprintf '%s/%s-%sx%s', $self->cache_dir, md5_sum($photo->{filename}), @$size;
 
   if(-e $out) {
     return $out;
@@ -427,13 +433,15 @@ sub _scale_photo {
   eval {
     my $img = Image::Imlib2->load($photo->{filename});
     $self->_more_photo_info($photo);
+    warn "[SHOTWELL] orientation=$photo->{orientation}\n" if DEBUG;
     $img->image_orientate($photo->{orientation}) if $photo->{orientation};
-    $img = $img->create_scaled_image(@size);
+    warn "[SHOTWELL] create_scaled_image(@$size)\n" if DEBUG;
+    $img = $img->create_scaled_image(@$size);
     $img->image_set_format('jpeg');
     $img->save($out);
     1;
   } or do {
-    $self->app->log->error("[Imlib2] $@");
+    $self->_log->error("[Imlib2] $@");
     $out = $photo->{filename};
   };
 
@@ -466,6 +474,7 @@ sub register {
   my($self, $app, $config) = @_;
   my $sizes = $self->sizes;
 
+  $self->_log($app->log);
   $self->_types($app->types);
   $self->dsn("dbi:SQLite:dbname=$config->{dbname}") if $config->{dbname};
 
