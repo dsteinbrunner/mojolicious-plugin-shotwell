@@ -1,4 +1,0 @@
-% for my $tag (@$tags) {
-%= $tag->{name};
-%= $tag->{url};
-% }

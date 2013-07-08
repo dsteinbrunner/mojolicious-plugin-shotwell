@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Tag - <%= $name %></title>
+  <meta charset="utf-8">
+</head>
+<body>
+<ul>
+% for my $photo (@$photos) {
+  <li id="<%= $photo->{id} %>">
+    %= image $photo->{thumb}, alt => $photo->{title}, title => $photo->{size}
+    <br>
+    %= link_to 'View', $photo->{url}, class => 'download'
+    %= link_to 'Raw', $photo->{raw}, class => 'raw'
+    %= link_to 'Download', "$photo->{raw}?download=1", class => 'download'
+  </li>
+% }
+</ul>
+</body>
+</html>

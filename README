@@ -22,6 +22,11 @@ SYNOPSIS
 
       app->start;
 
+    This module can also be tested from command line if you have the
+    defaults set up:
+
+      $ perl -Mojo -e'plugin "shotwell"; app->start' daemon
+
 DESCRIPTION
     This plugin provides actions which can render data from a Shotwell
     <http://www.yorba.org/projects/shotwell> database:

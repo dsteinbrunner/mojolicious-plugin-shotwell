@@ -1,6 +1,0 @@
-% for my $event (@$events) {
-%= $event->{id}
-%= $event->{name}
-%= localtime $event->{time_created}
-%= $event->{url}
-% }

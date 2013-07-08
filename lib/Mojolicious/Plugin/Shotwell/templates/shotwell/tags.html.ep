@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Tags</title>
+  <meta charset="utf-8">
+</head>
+<body>
+%= link_to 'Events', 'shotwell/events'
+<ul>
+% for my $tag (@$tags) {
+  <li id="<%= $tag->{name} %>">
+    %= link_to $tag->{name}, $tag->{url}
+  </li>
+% }
+</ul>
+</body>
+</html>

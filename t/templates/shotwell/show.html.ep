@@ -1,5 +1,0 @@
-%= $size
-%= $title
-%= $raw
-%= $thumb
-%= $url

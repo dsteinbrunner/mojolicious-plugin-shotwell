@@ -27,6 +27,11 @@ Mojolicious::Plugin::Shotwell - View photos from Shotwell database
 
   app->start;
 
+This module can also be tested from command line if you have the defaults set
+up:
+
+  $ perl -Mojo -e'plugin "shotwell"; app->start' daemon
+
 =head1 DESCRIPTION
 
 This plugin provides actions which can render data from a 
@@ -56,7 +61,8 @@ See L</show> and L</raw>.
 
 use Mojo::Base 'Mojolicious::Plugin';
 use Mojo::Util qw/ decode md5_sum /;
-use File::Basename;
+use File::Basename qw/ basename dirname /;
+use File::Spec::Functions qw/ catdir /;
 use DBI;
 use Image::EXIF;
 use Image::Imlib2;
@@ -390,12 +396,12 @@ sub _photos {
 
 sub _more_photo_info {
   my($self, $photo) = @_;
-  my $type;
 
-  $photo->{info} and return $photo;
-  $type = $photo->{filename} =~ /\.(\w+)$/ ? $self->_types->type($1) : '';
+  $photo->{type} and return $photo;
+  $photo->{type} = $self->_types->type(lc $1) if $photo->{filename} =~ /\.(\w+)$/;
+  $photo->{type} ||= 'unknown';
 
-  if($type eq 'image/jpeg') {
+  if($photo->{type} eq 'image/jpeg') {
     $photo->{info} = Image::EXIF->new($photo->{filename})->get_image_info || {};
     given($photo->{info}{'Image Orientation'} || 0) {
       when(/^.*left.*bottom/i)  { $photo->{orientation} = 3 }
@@ -403,9 +409,6 @@ sub _more_photo_info {
       when(/^.*right.*top/i)    { $photo->{orientation} = 1 }
       default                   { $photo->{orientation} = 0 }
     }
-  }
-  else {
-    $photo->{info} = {};
   }
 
   $photo->{height} ||= $photo->{info}{'Image Height'} || 0;
@@ -465,6 +468,10 @@ sub register {
 
   $self->_types($app->types);
   $self->dsn("dbi:SQLite:dbname=$config->{dbname}") if $config->{dbname};
+
+  unless($config->{skip_bundled_templates}) {
+    push @{ $app->renderer->paths }, catdir dirname(__FILE__), 'Shotwell', 'templates';
+  }
 
   for my $k (qw/ dsn cache_dir /) {
     $self->$k($config->{$k}) if $config->{$k};

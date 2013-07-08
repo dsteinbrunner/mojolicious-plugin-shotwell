@@ -35,12 +35,11 @@ $t->get_ok('/event-list.json')
 
 $t->get_ok('/event-list')
   ->status_is(200)
-  ->content_is(<<'  DOCUMENT');
-24
-Some-Event
-Mon Jul  8 11:53:52 2013
-/by-event/24/SomeEvent
-  DOCUMENT
+  ->element_exists('ul > li[id="24"]')
+  ->element_exists('ul > li[id="24"] a[href="/by-event/24/SomeEvent"]')
+  ->text_is('ul > li[id="24"] a[href="/by-event/24/SomeEvent"]', 'Some-Event')
+  ->text_is('ul > li[id="24"] small', 'Mon Jul 8 11:53:52 2013')
+  ;
 
 $t->get_ok('/by-event/24/Some-event.json')
   ->status_is(200)
@@ -54,14 +53,14 @@ $t->get_ok('/by-event/24/Some-event.json')
 
 $t->get_ok('/by-event/24/Some-event')
   ->status_is(200)
-  ->content_is(<<'  DOCUMENT');
-3
-123
-Yay!
-/raw-photo/3/IMG_01.jpg
-/render-thumb/3/IMG_01.jpg
-/show-photo/3/IMG_01.jpg
-  DOCUMENT
+  ->element_exists('ul > li[id="3"]')
+  ->element_exists('ul > li[id="3"] img[src="/render-thumb/3/IMG_01.jpg"]')
+  ->element_exists('ul > li[id="3"] img[alt="Yay!"]')
+  ->element_exists('ul > li[id="3"] img[title]')
+  ->element_exists('ul > li[id="3"] a[href="/show-photo/3/IMG_01.jpg"]')
+  ->element_exists('ul > li[id="3"] a[href="/raw-photo/3/IMG_01.jpg"]')
+  ->element_exists('ul > li[id="3"] a[href="/raw-photo/3/IMG_01.jpg?download=1"]')
+  ;
 
 $t->get_ok('/tag-list.json')
   ->status_is(200)
@@ -71,10 +70,9 @@ $t->get_ok('/tag-list.json')
 
 $t->get_ok('/tag-list')
   ->status_is(200)
-  ->content_is(<<'  DOCUMENT');
-Some-Tag
-/by-tag/Some-Tag
-  DOCUMENT
+  ->element_exists('ul > li[id="Some-Tag"]')
+  ->element_exists('ul > li[id="Some-Tag"] a[href="/by-tag/Some-Tag"]')
+  ;
 
 $t->get_ok('/by-tag/Some-Tag.json')
   ->status_is(200)
@@ -88,14 +86,14 @@ $t->get_ok('/by-tag/Some-Tag.json')
 
 $t->get_ok('/by-tag/Some-Tag')
   ->status_is(200)
-  ->content_is(<<'  DOCUMENT');
-3
-123
-Yay!
-/raw-photo/3/IMG_01.jpg
-/render-thumb/3/IMG_01.jpg
-/show-photo/3/IMG_01.jpg
-  DOCUMENT
+  ->element_exists('ul > li[id="3"]')
+  ->element_exists('ul > li[id="3"] img[src="/render-thumb/3/IMG_01.jpg"]')
+  ->element_exists('ul > li[id="3"] img[alt="Yay!"]')
+  ->element_exists('ul > li[id="3"] img[title]')
+  ->element_exists('ul > li[id="3"] a[href="/show-photo/3/IMG_01.jpg"]')
+  ->element_exists('ul > li[id="3"] a[href="/raw-photo/3/IMG_01.jpg"]')
+  ->element_exists('ul > li[id="3"] a[href="/raw-photo/3/IMG_01.jpg?download=1"]')
+  ;
 
 unlink '/tmp/shotwell/8ae91b49559136753575ca0c50b2126c-1024x0';
 $t->get_ok('/raw-photo/2/IMG_11.jpg')->status_is(404);
@@ -124,12 +122,9 @@ ok -s '/tmp/shotwell/8ae91b49559136753575ca0c50b2126c-120x120' > 1000, 'thumbnai
 
 $t->get_ok('/show-photo/3/IMG_01.jpg')
   ->status_is(200)
-  ->content_is(<<'  DOCUMENT');
-123
-Yay!
-/raw-photo/3/IMG_01.jpg
-/render-thumb/3/IMG_01.jpg
-/show-photo/3/IMG_01.jpg
-  DOCUMENT
+  ->element_exists('a[href="/raw-photo/3/IMG_01.jpg"]')
+  ->element_exists('img[src="/raw-photo/3/IMG_01.jpg?inline=1"]')
+  ->text_like('b', qr{Yay!, \d+})
+  ;
 
 done_testing;
