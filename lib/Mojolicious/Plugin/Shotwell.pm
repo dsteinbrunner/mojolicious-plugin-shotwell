@@ -276,7 +276,7 @@ sub tag {
   my($self, $c) = @_;
   my $sth = $self->_sth($c, photo_id_list_by_tag_name => $c->stash('name'));
   my $row = $sth->fetchrow_hashref or return $c->render_not_found;
-  my @ids = map { s/thumb0*//; hex } split /,/, $row->{photo_id_list} || '';
+  my @ids = map { s/thumb0*//; hex } grep { /^thumb/ } split /,/, $row->{photo_id_list} || '';
 
   $self->_photos(
     $c,
