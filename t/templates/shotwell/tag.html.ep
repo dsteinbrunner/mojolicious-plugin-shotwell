@@ -1,0 +1,8 @@
+% for my $photo (@$photos) {
+%= $photo->{id}
+%= $photo->{size}
+%= $photo->{title}
+%= $photo->{raw}
+%= $photo->{thumb}
+%= $photo->{url}
+% }

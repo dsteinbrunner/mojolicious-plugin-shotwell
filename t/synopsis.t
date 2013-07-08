@@ -5,10 +5,15 @@ use Test::Mojo;
 
 use Mojolicious::Lite;
 
-plan skip_all => 'HOME is not set' unless $ENV{HOME};
+$ENV{HOME} = 't';
 plan skip_all => 'Shotwell database is missing' unless -r "$ENV{HOME}/.local/share/shotwell/data/photo.db";
 
 {
+  get '/register' => sub {
+    my $c = shift;
+    $c->session(username => 'doe')->render(text => 'yay!');
+  };
+
   # allow /shotwell/... resources to be protected by login
   my $route = under '/shotwell' => sub {
     my $c = shift;
@@ -25,5 +30,7 @@ plan skip_all => 'Shotwell database is missing' unless -r "$ENV{HOME}/.local/sha
 my $t = Test::Mojo->new;
 
 $t->get_ok('/shotwell')->status_is(404);
+$t->get_ok('/register')->status_is(200);
+$t->get_ok('/shotwell')->status_is(200);
 
 done_testing;
