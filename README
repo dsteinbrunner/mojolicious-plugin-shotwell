@@ -54,9 +54,8 @@ ATTRIBUTES
 
       dbi:SQLite:dbname=$HOME/.local/share/shotwell/data/photo.db
 
-    $HOME is either the "SHOTWELL_HOME" or "HOME" environment variable. The
-    default attribute can be overridden by either giving "dsn" or "dbname"
-    to "register". Example:
+    $HOME is the "HOME" environment variable. The default dsn can be
+    overridden by either giving "dsn" or "dbname" to "register". Example:
 
       $self->register($app, { dbname => $path_to_db_file });
 

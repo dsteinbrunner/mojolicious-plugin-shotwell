@@ -102,16 +102,15 @@ Returns argument for L<DBI/connect>. Default is
 
   dbi:SQLite:dbname=$HOME/.local/share/shotwell/data/photo.db
 
-C<$HOME> is either the C<SHOTWELL_HOME> or C<HOME> environment variable. The
-default attribute can be overridden by either giving "dsn" or "dbname" to
-L</register>. Example:
+C<$HOME> is the C<HOME> environment variable. The default dsn can be
+overridden by either giving "dsn" or "dbname" to L</register>. Example:
 
   $self->register($app, { dbname => $path_to_db_file });
 
 =cut
 
 has dsn => sub {
-  my $home = $ENV{SHOTWELL_HOME} || $ENV{HOME} || '';
+  my $home = $ENV{HOME} || '';
   "dbi:SQLite:dbname=$home/.local/share/shotwell/data/photo.db";
 };
 
