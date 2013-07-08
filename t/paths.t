@@ -114,11 +114,11 @@ $t->get_ok('/raw-photo/3/IMG_01.jpg?download=1&inline=1')
 
 ok -e '/tmp/shotwell/8ae91b49559136753575ca0c50b2126c-1024x0', 'scaled image is created';
 
-unlink '/tmp/shotwell/8ae91b49559136753575ca0c50b2126c-120x120';
+unlink '/tmp/shotwell/8ae91b49559136753575ca0c50b2126c-100x100';
 $t->get_ok('/render-thumb/2/IMG_01.jpg')->status_is(404);
 $t->get_ok('/render-thumb/3/IMG_11.jpg')->status_is(500);
 $t->get_ok('/render-thumb/3/IMG_01.jpg')->status_is(200);
-ok -s '/tmp/shotwell/8ae91b49559136753575ca0c50b2126c-120x120' > 1000, 'thumbnail was generated';
+ok -s '/tmp/shotwell/8ae91b49559136753575ca0c50b2126c-100x100' > 1000, 'thumbnail was generated';
 
 $t->get_ok('/show-photo/3/IMG_01.jpg')
   ->status_is(200)
