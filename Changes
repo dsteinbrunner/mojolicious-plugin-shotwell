@@ -1,6 +1,6 @@
 Revision history for Mojolicious-Plugin-Shotwell
 
-0.03
+0.03     Thu Jul 11 15:21:43 2013
        * Add support for permalinks
        * Will die unless able to connect to database
 
