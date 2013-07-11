@@ -92,4 +92,22 @@ my $url;
   $t->get_ok("/$permalink/delete.json?allow_access=1")->status_is(404);
 }
 
+{
+  my($url, $permalink);
+  $t->get_ok('/show/4/IMG_02.jpg?allow_access=1&permalink=1')->status_is(302);
+  $url = $t->tx->res->headers->location || '';
+  $permalink = $url =~ /(\w+)$/ ? $1 : 'UNKNOWN';
+  diag $url;
+
+  $t->get_ok("/$permalink")->status_is(200);
+  $t->get_ok('/raw/3/IMG_01.jpg')->status_is(401);
+  $t->get_ok('/raw/4/IMG_02.jpg')->status_is(200);
+
+  $t->get_ok("/$permalink/delete.json")->status_is(200);
+  $t->get_ok('/raw/3/IMG_01.jpg')->status_is(401);
+  $t->get_ok('/raw/4/IMG_02.jpg')->status_is(401);
+
+  $t->get_ok("/$permalink/delete.json?allow_access=1")->status_is(404);
+}
+
 done_testing;

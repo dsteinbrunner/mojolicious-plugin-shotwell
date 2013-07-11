@@ -280,12 +280,22 @@ sub permalink {
 
   if($row->{type} eq 'collection') {
     warn "[SHOTWELL] render collection from permalink\n" if DEBUG;
-    $c->stash(template => 'shotwell/event');
+    $c->stash(
+      comment => $row->{comment},
+      template => 'shotwell/event',
+      foreign_ids => \@ids,
+    );
     $self->_photos($c, sprintf($SST{photos_by_ids}, join ',', map { '?' } @ids), @ids);
   }
   else {
     warn "[SHOTWELL] render single image from permalink\n" if DEBUG;
-    $c->stash(id => $ids[0], basename => SPECIAL_BASENAME, template => 'shotwell/show');
+    $c->stash(
+      id => $ids[0],
+      basename => SPECIAL_BASENAME,
+      comment => $row->{comment},
+      foreign_ids => \@ids,
+      template => 'shotwell/show',
+    );
     $self->show($c);
   }
 }
@@ -419,8 +429,12 @@ The stash data is the same as one element described for L</event> JSON data.
 =cut
 
 sub show {
-  my($self, $c) = @_;
+  my($self, $c, $skip_permalink) = @_;
   my $photo = $self->_photo($c) or return;
+
+  if(!$c->stash('foreign_ids') and $c->param('permalink')) {
+    return $self->_permalink_create($c, single => [$photo->{id}]);
+  }
 
   $c->render(
     size => $photo->{filesize} || 0,
@@ -781,7 +795,7 @@ FROM PhotoTable
 WHERE id = ?
 
 --- permalink
-SELECT type, foreign_ids
+SELECT type, foreign_ids, comment
 FROM mojolicious_plugin_shotwell_permalinks
 WHERE permalink = ?
 
