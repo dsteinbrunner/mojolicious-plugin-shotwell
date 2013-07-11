@@ -34,7 +34,7 @@ up:
 
 =head1 DESCRIPTION
 
-This plugin provides actions which can render data from a 
+This plugin provides actions which can render data from a
 L<Shotwell|http://www.yorba.org/projects/shotwell> database:
 
 =over 4
@@ -67,6 +67,7 @@ use DBI;
 use Image::EXIF;
 use Image::Imlib2;
 use constant DEBUG => $ENV{MOJO_SHOTWELL_DEBUG} ? 1 : 0;
+use constant DEFAULT_DBI_ATTRS => { RaiseError => 1, PrintError => 0, AutoCommit => 1 };
 
 our $VERSION = '0.02';
 our %SST;
@@ -220,7 +221,7 @@ JSON data:
   ]
 
 The JSON data is also available in the template as C<$photos>.
- 
+
 =cut
 
 sub event {
@@ -450,13 +451,13 @@ sub _scale_photo {
 
 sub _sth {
   my($self, $c, $key, @bind) = @_;
-  my $dbh = $c->stash->{'shotwell.dbh'} ||= DBI->connect($self->dsn);
+  my $dbh = $c->stash->{'shotwell.dbh'} ||= DBI->connect(@{ $self->dsn });
   my $sth;
 
   warn "[SHOTWELL:DBI] @{[$SST{$key} || $key]}(@bind)\n---\n" if DEBUG;
 
-  $sth = $dbh->prepare($SST{$key} || $key) or die $dbh->errstr;
-  $sth->execute(@bind) or die $sth->errstr;
+  $sth = $dbh->prepare($SST{$key} || $key);
+  $sth->execute(@bind);
   $sth;
 }
 
@@ -489,6 +490,7 @@ sub register {
     $sizes->{$k} = $config->{sizes}{$k} if $config->{sizes}{$k};
   }
 
+  $self->dsn([ $self->dsn, '', '', DEFAULT_DBI_ATTRS ]) unless ref $self->dsn eq 'ARRAY';
   $self->_register_routes($config->{route} || $app->routes, %{ $config->{paths} || {} });
 }
 
