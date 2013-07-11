@@ -13,16 +13,19 @@ Mojolicious::Plugin::Shotwell - View photos from Shotwell database
   use Mojolicious::Lite;
 
   # allow /shotwell/... resources to be protected by login
-  my $route = under '/shotwell' => sub {
+  my $protected = under '/shotwell' => sub {
     my $c = shift;
-    return 1 if $c->session('username');
+    return 1 if $c->session('username') or $c->shotwell_access_granted;
     $c->render('login');
     return 0;
   };
 
   plugin shotwell => {
     dbname => '/home/username/.local/share/shotwell/data/photo.db',
-    route => $route,
+    routes => {
+      default => $protected,
+      permalink => app->routes->get('/:permalink'), # not protected
+    }
   };
 
   app->start;
@@ -68,6 +71,8 @@ use Image::EXIF;
 use Image::Imlib2;
 use constant DEBUG => $ENV{MOJO_SHOTWELL_DEBUG} ? 1 : 0;
 use constant DEFAULT_DBI_ATTRS => { RaiseError => 1, PrintError => 0, AutoCommit => 1 };
+use constant SHOTWELL_PERMALINK => 'spl';
+use constant SPECIAL_BASENAME => md5_sum(time .$$ .rand 9999999);
 
 our $VERSION = '0.02';
 our %SST;
@@ -80,7 +85,7 @@ our %SST;
       $k = $1;
       $sst = '';
     }
-    elsif($k and /\w/) {
+    elsif($k and /\S/) {
       $sst .= $_;
     }
   }
@@ -156,6 +161,8 @@ has _log => sub { Mojo::Log->new };
 
 =head2 events
 
+Default route: C</>.
+
 Render data from EventTable. Data is rendered as JSON or defaults to a
 template by the name "templates/shotwell/events.html.ep".
 
@@ -203,6 +210,8 @@ sub events {
 
 =head2 event
 
+Default route: C</event/:id/:name>.
+
 Render photos from PhotoTable, by a given event id. Data is rendered as JSON
 or defaults to a template by the name "templates/shotwell/event.html.ep".
 
@@ -230,10 +239,84 @@ sub event {
   my $row = $sth->fetchrow_hashref or return $c->render_not_found;
 
   $c->stash(name => decode('UTF-8', $row->{name}));
-  $self->_photos($c, photos_by_event_id => $c->stash('id'));
+
+  if($c->param('permalink')) {
+    $self->_permalink_create($c, collection => $self->_event_to_photo_ids($c));
+  }
+  else {
+    $self->_photos($c, photos_by_event_id => $c->stash('id'));
+  }
+}
+
+sub _event_to_photo_ids {
+  my($self, $c) = @_;
+  my $sth = $self->_sth($c, photos_by_event_id => $c->stash('id'));
+  my $ids = [];
+
+  while(my $photo = $sth->fetchrow_hashref('NAME_lc')) {
+    push @$ids, $photo->{id};
+  }
+
+  return $ids;
+}
+
+=head2 permalink
+
+Default route: C</:permalink>.
+
+Will either render the same as L</show> or L</event>, dependent on the
+type of permalink.
+
+=cut
+
+sub permalink {
+  my($self, $c) = @_;
+  my $sth = $self->_sth($c, permalink => $c->stash('permalink'));
+  my $row = $sth->fetchrow_hashref or return $c->render_not_found;
+  my @ids = split /,/, $row->{foreign_ids};
+
+  # store it for shotwell_access_granted() helper usage
+  $c->session(SHOTWELL_PERMALINK, $c->stash('permalink'));
+
+  if($row->{type} eq 'collection') {
+    warn "[SHOTWELL] render collection from permalink\n" if DEBUG;
+    $c->stash(template => 'shotwell/event');
+    $self->_photos($c, sprintf($SST{photos_by_ids}, join ',', map { '?' } @ids), @ids);
+  }
+  else {
+    warn "[SHOTWELL] render single image from permalink\n" if DEBUG;
+    $c->stash(id => $ids[0], basename => SPECIAL_BASENAME, template => 'shotwell/show');
+    $self->show($c);
+  }
+}
+
+=head2 permalink_delete
+
+Default route: C</:permalink/delete>.
+
+Used to delete a permalink from backend.
+
+=cut
+
+sub permalink_delete {
+  my($self, $c) = @_;
+  my $sth = $self->_sth($c, permalink_delete => $c->stash('permalink'));
+
+  if($sth->rows) {
+    delete $c->session->{SHOTWELL_PERMALINK()};
+    $c->respond_to(
+      json => sub { shift->render(json => {}) },
+      any => sub { shift->render },
+    );
+  }
+  else {
+    $c->render_not_found;
+  }
 }
 
 =head2 tags
+
+Default route: C</tags>.
 
 Render data from TagTable. Data is rendered as JSON or defaults to a template
 by the name "templates/shotwell/tags.html.ep".
@@ -273,6 +356,8 @@ sub tags {
 
 =head2 tag
 
+Default route: C</tag/:name>.
+
 Render photos from PhotoTable, by a given tag name. Data is rendered as JSON
 or defaults to a template by the name "templates/shotwell/tag.html.ep".
 
@@ -286,10 +371,17 @@ sub tag {
   my $row = $sth->fetchrow_hashref or return $c->render_not_found;
   my @ids = map { s/thumb0*//; hex } grep { /^thumb/ } split /,/, $row->{photo_id_list} || '';
 
-  $self->_photos($c, sprintf($SST{photos_by_ids}, join ',', map { '?' } @ids), @ids);
+  if($c->param('permalink')) {
+    $self->_permalink_create($c, collection => \@ids);
+  }
+  else {
+    $self->_photos($c, sprintf($SST{photos_by_ids}, join ',', map { '?' } @ids), @ids);
+  }
 }
 
 =head2 raw
+
+Default route: C</raw/:id/*basename>.
 
 Render raw photo.
 
@@ -317,6 +409,8 @@ sub raw {
 
 =head2 show
 
+Default route: C</show/:id/*basename>.
+
 Render a template with an photo inside. The name of the template is
 "templates/shotwell/show.html.ep".
 
@@ -331,13 +425,15 @@ sub show {
   $c->render(
     size => $photo->{filesize} || 0,
     title => decode('UTF-8', $photo->{title} || $c->stash('basename')),
-    raw => $c->url_for('shotwell/raw'),
-    thumb => $c->url_for('shotwell/thumb'),
-    url => $c->url_for('shotwell/show'),
+    raw => $c->url_for('shotwell/raw', %$photo),
+    thumb => $c->url_for('shotwell/thumb', %$photo),
+    url => $c->url_for('shotwell/show', %$photo),
   );
 }
 
 =head2 thumb
+
+Default route: C</thumb/:id/*basename>.
 
 Render photo as a thumbnail.
 
@@ -351,6 +447,24 @@ sub thumb {
 
   return $c->rendered if $static->serve($c, basename $file);
   return $c->render_exception("Unable to serve ($file)");
+}
+
+sub _permalink_create {
+  my($self, $c, $type, $ids) = @_;
+  my $sth = $self->_sth($c, 'permalink_create', { execute => 0 });
+  my $comment = $c->tx->remote_address || '';
+  my $time = time;
+  my $permalink;
+
+  $ids = join ',', @$ids;
+
+  do {
+    $permalink = substr md5_sum($time. $$. rand 99999), 2, 15; # 2 and 15 is not chosen for any special reason
+    eval { $sth->execute($time, $permalink, $type, $ids, $comment) };
+  } while($@);
+
+  $c->session(SHOTWELL_PERMALINK, $permalink);
+  $c->redirect_to('shotwell/permalink', permalink => $permalink);
 }
 
 sub _photo {
@@ -368,29 +482,32 @@ sub _photo {
   $photo->{filename} ||= '';
   $basename = basename $photo->{filename};
 
-  if($c->stash('basename') ne $basename) {
+  if($c->stash('basename') ne $basename and $c->stash('basename') ne SPECIAL_BASENAME) {
     _DUMP 'photo=%s', $photo if DEBUG;
     $c->render_exception("Invalid basename: $basename");
     return;
   }
 
-  return $photo;
+  $c->stash(basename => $basename);
+  $photo->{basename} = $basename;
+  $photo;
 }
 
 sub _photos {
   my($self, $c, @sth) = @_;
   my $sth = $self->_sth($c, @sth);
-  my @photos;
+  my(@photos, @ids);
 
   while(my $photo = $sth->fetchrow_hashref('NAME_lc')) {
-    my $basename = basename $photo->{filename};
+    $photo->{basename} = basename $photo->{filename};
+    push @ids, $photo->{id};
     push @photos, {
       id => int $photo->{id},
       size => int $photo->{filesize} || 0,
-      title => decode('UTF-8', $photo->{title} || $basename),
-      raw => $c->url_for('shotwell/raw' => id => $photo->{id}, basename => $basename),
-      thumb => $c->url_for('shotwell/thumb' => id => $photo->{id}, basename => $basename),
-      url => $c->url_for('shotwell/show' => id => $photo->{id}, basename => $basename),
+      title => decode('UTF-8', $photo->{title} || $photo->{basename}),
+      raw => $c->url_for('shotwell/raw' => %$photo),
+      thumb => $c->url_for('shotwell/thumb' => %$photo),
+      url => $c->url_for('shotwell/show' => %$photo),
     };
   }
 
@@ -454,11 +571,40 @@ sub _sth {
   my $dbh = $c->stash->{'shotwell.dbh'} ||= DBI->connect(@{ $self->dsn });
   my $sth;
 
-  warn "[SHOTWELL:DBI] @{[$SST{$key} || $key]}(@bind)\n---\n" if DEBUG;
-
   $sth = $dbh->prepare($SST{$key} || $key);
-  $sth->execute(@bind);
+
+  unless(ref $bind[0]) {
+    warn "[SHOTWELL:DBI] @{[$SST{$key} || $key]}(@bind)\n---\n" if DEBUG;
+    $sth->execute(@bind) unless ref $bind[0];
+  }
+
   $sth;
+}
+
+=head1 HELPERS
+
+=head2 shotwell_access_granted
+
+  $bool = $c->shotwell_access_granted;
+
+Returns true if the L<session|Mojolicious::Controller/session> contains a
+valid permalink id.
+
+=cut
+
+sub shotwell_access_granted {
+  my($self, $c) = @_;
+  my $permalink = $c->session(SHOTWELL_PERMALINK) or return 0;
+  my $sth = $self->_sth($c, permalink => $permalink);
+  my $row = $sth->fetchrow_hashref or return 0;
+
+  if($c->req->url =~ m!/(\d+)/!) { # TODO: This is one ugly hack :(
+    my $id = $1;
+    return $row->{foreign_ids} =~ /\b$id\b/ ? 1 : 0;
+  }
+  else {
+    return 1;
+  }
 }
 
 =head1 METHODS
@@ -478,6 +624,7 @@ sub register {
   $self->_log($app->log);
   $self->_types($app->types);
   $self->dsn("dbi:SQLite:dbname=$config->{dbname}") if $config->{dbname};
+  $app->helper(shotwell_access_granted => sub { $self->shotwell_access_granted(@_) });
 
   unless($config->{skip_bundled_templates}) {
     push @{ $app->renderer->paths }, catdir dirname(__FILE__), 'Shotwell', 'templates';
@@ -490,23 +637,52 @@ sub register {
     $sizes->{$k} = $config->{sizes}{$k} if $config->{sizes}{$k};
   }
 
+  if($config->{paths}) {
+    warn "/config/paths is replaced by /config/routes !!!";
+    $config->{routes} = delete $config->{paths}; # backward compat
+  }
+  if($config->{route}) {
+    warn "/config/route is replaced by /config/routes/default !!!";
+    $config->{routes}{default} = delete $config->{route}; # backward compat
+  }
+
   $self->dsn([ $self->dsn, '', '', DEFAULT_DBI_ATTRS ]) unless ref $self->dsn eq 'ARRAY';
-  $self->_register_routes($config->{route} || $app->routes, %{ $config->{paths} || {} });
+  $self->_create_missing_tables;
+  $self->_register_routes($app, %{ $config->{routes} || {} });
+}
+
+sub _create_missing_tables {
+  my $self = shift;
+  my $dbh = DBI->connect(@{ $self->dsn });
+
+  # create "permalinks" table unless it already exists
+  eval {
+    $dbh->prepare('SELECT COUNT(*) FROM mojolicious_plugin_shotwell_permalinks');
+  } or do {
+    warn $@ if DEBUG;
+    $dbh->prepare($SST{create_permalink_table})->execute;
+    $dbh->prepare($SST{create_permalink_index})->execute;
+  };
 }
 
 sub _register_routes {
-  my($self, $route, %paths) = @_;
+  my($self, $app, %routes) = @_;
 
-  $paths{events} ||= '/';
-  $paths{event} ||= '/event/:id/:name';
-  $paths{tags} ||= '/tags';
-  $paths{tag} ||= '/tag/:name';
-  $paths{raw} ||= '/raw/:id/*basename';
-  $paths{show} ||= '/show/:id/*basename';
-  $paths{thumb} ||= '/thumb/:id/*basename';
+  $routes{default} ||= $app->routes;
+  $routes{events} ||= '/';
+  $routes{event} ||= '/event/:id/:name';
+  $routes{tags} ||= '/tags';
+  $routes{tag} ||= '/tag/:name';
+  $routes{raw} ||= '/raw/:id/*basename';
+  $routes{show} ||= '/show/:id/*basename';
+  $routes{thumb} ||= '/thumb/:id/*basename';
+  $routes{permalink} ||= '/:permalink';
+  $routes{permalink_delete} ||= '/:permalink/delete';
 
-  for my $k (sort { length $paths{$b} <=> length $paths{$a} } keys %paths) {
-    $route->get($paths{$k})->to(cb => sub { $self->$k(@_); })->name("shotwell/$k");
+  for my $k (qw/ events event tags tag raw show thumb permalink permalink_delete /) {
+    warn "[SHOTWELL:ROUTE] $k => $routes{$k}\n" if DEBUG;
+    my $route = UNIVERSAL::isa($routes{$k}, 'Mojolicious::Routes::Route') ? $routes{$k} : $routes{default}->get($routes{$k});
+    $route->to(cb => sub { $self->$k(@_); })->name("shotwell/$k");
   }
 }
 
@@ -600,8 +776,36 @@ WHERE id IN (%s)
 ORDER BY timestamp
 
 --- photo_by_id
-SELECT filename, filesize, title
+SELECT id, filename, filesize, title
 FROM PhotoTable
 WHERE id = ?
+
+--- permalink
+SELECT type, foreign_ids
+FROM mojolicious_plugin_shotwell_permalinks
+WHERE permalink = ?
+
+--- permalink_create
+INSERT INTO mojolicious_plugin_shotwell_permalinks
+(time_created, permalink, type, foreign_ids, comment)
+VALUES(?, ?, ?, ?, ?)
+
+--- permalink_delete
+DELETE FROM mojolicious_plugin_shotwell_permalinks
+WHERE permalink = ?
+
+--- create_permalink_table
+CREATE TABLE mojolicious_plugin_shotwell_permalinks (
+  time_created INTEGER NOT NULL,
+  permalink TEXT UNIQUE NOT NULL,
+  type TEXT NOT NULL,
+  foreign_ids TEXT NOT NULL,
+  comment TEXT NOT NULL
+)
+
+--- create_permalink_index
+CREATE INDEX permalinks_permalink_index
+ON mojolicious_plugin_shotwell_permalinks
+(permalink);
 
 --- END

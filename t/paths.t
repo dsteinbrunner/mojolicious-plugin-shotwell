@@ -11,7 +11,7 @@ plan skip_all => 'Cannot read t/data/photo.db' unless -r 't/data/photo.db';
 {
   plugin shotwell => {
     dbname => $dbname,
-    paths => {
+    routes => {
       events => '/event-list',
       event => '/by-event/:id/:name',
       tags => '/tag-list',

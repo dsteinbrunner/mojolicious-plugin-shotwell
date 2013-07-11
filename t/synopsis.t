@@ -15,15 +15,18 @@ plan skip_all => 'Shotwell database is missing' unless -r "$ENV{HOME}/.local/sha
   };
 
   # allow /shotwell/... resources to be protected by login
-  my $route = under '/shotwell' => sub {
+  my $protected = under '/shotwell' => sub {
     my $c = shift;
-    return 1 if $c->session('username');
+    return 1 if $c->session('username') or $c->shotwell_access_granted;
     $c->render('login');
     return 0;
   };
 
   plugin shotwell => {
-    route => $route,
+    routes => {
+      default => $protected,
+      permalink => app->routes->get('/:permalink'), # not protected
+    }
   };
 }
 
