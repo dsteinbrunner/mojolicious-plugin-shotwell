@@ -1,5 +1,8 @@
 Revision history for Mojolicious-Plugin-Shotwell
 
+0.0401   Fri Aug 16 23:23:09 2013
+       * Fix NAME in Makefile.PL
+
 0.04     Thu Jul 11 15:39:45 2013
        * Add support for creating permalinks for single images
 

@@ -2,7 +2,7 @@ NAME
     Mojolicious::Plugin::Shotwell - View photos from Shotwell database
 
 VERSION
-    0.04
+    0.0401
 
 SYNOPSIS
       use Mojolicious::Lite;

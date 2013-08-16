@@ -6,7 +6,7 @@ Mojolicious::Plugin::Shotwell - View photos from Shotwell database
 
 =head1 VERSION
 
-0.04
+0.0401
 
 =head1 SYNOPSIS
 
@@ -74,7 +74,7 @@ use constant DEFAULT_DBI_ATTRS => { RaiseError => 1, PrintError => 0, AutoCommit
 use constant SHOTWELL_PERMALINK => 'spl';
 use constant SPECIAL_BASENAME => md5_sum(time .$$ .rand 9999999);
 
-our $VERSION = '0.04';
+our $VERSION = '0.0401';
 our %SST;
 
 {
