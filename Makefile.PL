@@ -1,6 +1,6 @@
 use ExtUtils::MakeMaker;
 WriteMakefile(
-  NAME => 'Mojolicious-Plugin-Shotwell',
+  NAME => 'Mojolicious::Plugin::Shotwell',
   VERSION_FROM => 'lib/Mojolicious/Plugin/Shotwell.pm',
   AUTHOR => 'Jan Henning Thorsen <jhthorsen@cpan.org>',
   PREREQ_PM => {
