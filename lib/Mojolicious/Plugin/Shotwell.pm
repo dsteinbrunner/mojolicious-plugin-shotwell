@@ -6,7 +6,7 @@ Mojolicious::Plugin::Shotwell - View photos from Shotwell database
 
 =head1 VERSION
 
-0.0401
+0.0402
 
 =head1 SYNOPSIS
 
@@ -74,7 +74,7 @@ use constant DEFAULT_DBI_ATTRS => { RaiseError => 1, PrintError => 0, AutoCommit
 use constant SHOTWELL_PERMALINK => 'spl';
 use constant SPECIAL_BASENAME => md5_sum(time .$$ .rand 9999999);
 
-our $VERSION = '0.0401';
+our $VERSION = '0.0402';
 our %SST;
 
 {
@@ -188,6 +188,7 @@ sub events {
   my @events;
 
   while(my $event = $sth->fetchrow_hashref('NAME_lc')) {
+    (my $name = $event->{name}) =~ s/\W//g; # /
     push @events, {
       id => int $event->{id},
       name => decode('UTF-8', $event->{name}),
@@ -196,7 +197,7 @@ sub events {
               'shotwell/event' => (
                 id => $event->{id},
                 format => $c->stash('format'),
-                name => $event->{name} =~ s/\W//gr, # /
+                name => $name,
               )
              ),
     };

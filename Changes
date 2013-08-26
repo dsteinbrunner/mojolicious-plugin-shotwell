@@ -1,5 +1,8 @@
 Revision history for Mojolicious-Plugin-Shotwell
 
+0.0402   Mon Aug 26 23:46:04 2013
+       * s///r is not supported in perl < 5.14
+
 0.0401   Fri Aug 16 23:23:09 2013
        * Fix NAME in Makefile.PL
 
